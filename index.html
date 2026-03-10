@@ -756,13 +756,9 @@
   }
 
   /* ── EXPORT ── */
-  function renderToDataUrl(index) {
+  function renderToCanvas(offscreen, index) {
     return new Promise((resolve) => {
-      const offscreen = document.createElement('canvas');
-      offscreen.width = W;
-      offscreen.height = H;
       const octx = offscreen.getContext('2d');
-
       const slide = state.slides[index];
 
       octx.fillStyle = '#111111';
@@ -775,7 +771,7 @@
 
       function finish() {
         drawOverlayTo(octx, slide, AVATAR_X, AVATAR_Y, AVATAR_SIZE, PAD, index);
-        resolve(offscreen.toDataURL('image/png'));
+        resolve();
       }
 
       if (state.profile.avatarDataUrl) {
@@ -883,11 +879,18 @@
   }
 
   async function downloadCurrent() {
-    const dataUrl = await renderToDataUrl(state.current);
-    const a = document.createElement('a');
-    a.href = dataUrl;
-    a.download = `slide-${state.current + 1}.png`;
-    a.click();
+    const offscreen = document.createElement('canvas');
+    offscreen.width = W;
+    offscreen.height = H;
+    await renderToCanvas(offscreen, state.current);
+    offscreen.toBlob((blob) => {
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `slide-${state.current + 1}.png`;
+      a.click();
+      URL.revokeObjectURL(url);
+    }, 'image/png');
   }
 
   async function downloadAll() {
@@ -899,7 +902,11 @@
     const zip = new JSZip();
 
     for (let i = 0; i < state.slides.length; i++) {
-      const dataUrl = await renderToDataUrl(i);
+      const offscreen = document.createElement('canvas');
+      offscreen.width = W;
+      offscreen.height = H;
+      await renderToCanvas(offscreen, i);
+      const dataUrl = offscreen.toDataURL('image/png');
       const base64 = dataUrl.replace('data:image/png;base64,', '');
       zip.file(`slide-${i + 1}.png`, base64, { base64: true });
     }
