@@ -878,6 +878,10 @@
     return lines;
   }
 
+  function todayStr() {
+    return new Date().toISOString().slice(0, 10);
+  }
+
   async function downloadCurrent() {
     const offscreen = document.createElement('canvas');
     offscreen.width = W;
@@ -887,7 +891,7 @@
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = `slide-${state.current + 1}.png`;
+      a.download = `slide-${state.current + 1}-${todayStr()}.png`;
       a.click();
       URL.revokeObjectURL(url);
     }, 'image/png');
@@ -915,7 +919,7 @@
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = 'carousel.zip';
+    a.download = `carousel-${todayStr()}.zip`;
     a.click();
     URL.revokeObjectURL(url);
   }
