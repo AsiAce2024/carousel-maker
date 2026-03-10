@@ -570,6 +570,7 @@
 
       ctx.font = '64px "Segoe UI", Arial, sans-serif';
       ctx.fillStyle = '#ffffff';
+      ctx.direction = /[\u0590-\u05FF]/.test(slide.text) ? 'rtl' : 'ltr';
       ctx.textAlign = 'right';
       ctx.textBaseline = 'top';
 
@@ -841,6 +842,7 @@
 
       octx.font = '64px "Segoe UI", Arial, sans-serif';
       octx.fillStyle = '#ffffff';
+      octx.direction = /[\u0590-\u05FF]/.test(slide.text) ? 'rtl' : 'ltr';
       octx.textAlign = 'right';
       octx.textBaseline = 'top';
 
