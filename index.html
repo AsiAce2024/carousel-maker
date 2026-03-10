@@ -392,6 +392,18 @@
     .editor::-webkit-scrollbar { width: 6px; }
     .editor::-webkit-scrollbar-track { background: transparent; }
     .editor::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+
+    /* scheme picker */
+    .scheme-picker { display: flex; gap: 8px; margin-top: 2px; }
+    .scheme-swatch {
+      width: 32px; height: 32px; border-radius: 50%;
+      border: 2px solid transparent; cursor: pointer;
+      outline: none; transition: border-color 0.15s, box-shadow 0.15s;
+    }
+    .scheme-swatch.active {
+      border-color: var(--accent);
+      box-shadow: 0 0 0 2px var(--bg), 0 0 0 4px var(--accent);
+    }
   </style>
 </head>
 <body>
@@ -434,6 +446,15 @@
         </label>
         <span>תג מאומת (✓)</span>
       </div>
+
+      <div class="field">
+        <label>צבעי רקע</label>
+        <div class="scheme-picker">
+          <button class="scheme-swatch active" data-scheme="dark"  onclick="onSchemeChange('dark')"  title="כהה"            style="background:#111111;"></button>
+          <button class="scheme-swatch"        data-scheme="light" onclick="onSchemeChange('light')" title="בהיר"           style="background:#ffffff; border-color:#ccc;"></button>
+          <button class="scheme-swatch"        data-scheme="green" onclick="onSchemeChange('green')" title="ירוק (WhatsApp)" style="background:#25D366;"></button>
+        </div>
+      </div>
     </div>
 
     <!-- Slides -->
@@ -475,6 +496,13 @@
     },
     slides: [{ text: '' }],
     current: 0,
+    scheme: 'dark',
+  };
+
+  const SCHEMES = {
+    dark:  { bg: '#111111', text: '#ffffff', textMuted: '#555555', avatarPlaceholder: '#2a2a2a' },
+    light: { bg: '#ffffff', text: '#000000', textMuted: '#888888', avatarPlaceholder: '#dddddd' },
+    green: { bg: '#25D366', text: '#ffffff', textMuted: 'rgba(255,255,255,0.6)', avatarPlaceholder: '#1aaf57' },
   };
 
   /* ── CANVAS ── */
@@ -490,7 +518,7 @@
     ctx.clearRect(0, 0, W, H);
 
     // Background
-    ctx.fillStyle = '#111111';
+    ctx.fillStyle = SCHEMES[state.scheme].bg;
     ctx.fillRect(0, 0, W, H);
 
     const PAD = 72;
@@ -517,7 +545,7 @@
       ctx.save();
       ctx.beginPath();
       ctx.arc(AVATAR_X + AVATAR_SIZE / 2, AVATAR_Y + AVATAR_SIZE / 2, AVATAR_SIZE / 2, 0, Math.PI * 2);
-      ctx.fillStyle = '#2a2a2a';
+      ctx.fillStyle = SCHEMES[state.scheme].avatarPlaceholder;
       ctx.fill();
       ctx.restore();
       drawOverlay(slide, AVATAR_X, AVATAR_Y, AVATAR_SIZE, PAD, index);
@@ -530,7 +558,7 @@
     const nameY = AVATAR_Y + AVATAR_SIZE / 2;
 
     ctx.font = 'bold 40px "Segoe UI", Arial, sans-serif';
-    ctx.fillStyle = '#ffffff';
+    ctx.fillStyle = SCHEMES[state.scheme].text;
     ctx.textBaseline = 'middle';
     ctx.textAlign = 'left';
 
@@ -540,12 +568,20 @@
     // Verified badge
     if (state.profile.verified) {
       const nameWidth = ctx.measureText(name).width;
-      const badgeX = nameX + nameWidth + 14;
+      const badgeX = nameX + nameWidth + 26;
       const badgeY = nameY;
-      const badgeR = 18;
+      const outerR = 18, innerR = 14, pts = 12;
+      const step = Math.PI / pts;
 
       ctx.beginPath();
-      ctx.arc(badgeX, badgeY, badgeR, 0, Math.PI * 2);
+      for (let i = 0; i < pts * 2; i++) {
+        const angle = i * step - Math.PI / 2;
+        const r = i % 2 === 0 ? outerR : innerR;
+        const x = badgeX + Math.cos(angle) * r;
+        const y = badgeY + Math.sin(angle) * r;
+        if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+      }
+      ctx.closePath();
       ctx.fillStyle = '#1d9bf0';
       ctx.fill();
 
@@ -569,7 +605,7 @@
       const startY = textAreaTop + (textAreaHeight - totalHeight) / 2;
 
       ctx.font = '64px "Segoe UI", Arial, sans-serif';
-      ctx.fillStyle = '#ffffff';
+      ctx.fillStyle = SCHEMES[state.scheme].text;
       ctx.direction = /[\u0590-\u05FF]/.test(slide.text) ? 'rtl' : 'ltr';
       ctx.textAlign = 'right';
       ctx.textBaseline = 'top';
@@ -583,7 +619,7 @@
     const total = state.slides.length;
     if (total > 1) {
       ctx.font = '28px "Segoe UI", Arial, sans-serif';
-      ctx.fillStyle = '#555555';
+      ctx.fillStyle = SCHEMES[state.scheme].textMuted;
       ctx.textAlign = 'center';
       ctx.textBaseline = 'bottom';
       ctx.fillText(`${index + 1} / ${total}`, W / 2, H - 36);
@@ -706,6 +742,14 @@
     renderSlide(state.current);
   }
 
+  function onSchemeChange(scheme) {
+    state.scheme = scheme;
+    document.querySelectorAll('.scheme-swatch').forEach(el => {
+      el.classList.toggle('active', el.dataset.scheme === scheme);
+    });
+    renderSlide(state.current);
+  }
+
   function onAvatarUpload(event) {
     const file = event.target.files[0];
     if (!file) return;
@@ -762,7 +806,7 @@
       const octx = offscreen.getContext('2d');
       const slide = state.slides[index];
 
-      octx.fillStyle = '#111111';
+      octx.fillStyle = SCHEMES[state.scheme].bg;
       octx.fillRect(0, 0, W, H);
 
       const PAD = 72;
@@ -791,7 +835,7 @@
         octx.save();
         octx.beginPath();
         octx.arc(AVATAR_X + AVATAR_SIZE / 2, AVATAR_Y + AVATAR_SIZE / 2, AVATAR_SIZE / 2, 0, Math.PI * 2);
-        octx.fillStyle = '#2a2a2a';
+        octx.fillStyle = SCHEMES[state.scheme].avatarPlaceholder;
         octx.fill();
         octx.restore();
         finish();
@@ -804,7 +848,7 @@
     const nameY = AVATAR_Y + AVATAR_SIZE / 2;
 
     octx.font = 'bold 40px "Segoe UI", Arial, sans-serif';
-    octx.fillStyle = '#ffffff';
+    octx.fillStyle = SCHEMES[state.scheme].text;
     octx.textBaseline = 'middle';
     octx.textAlign = 'left';
 
@@ -813,12 +857,20 @@
 
     if (state.profile.verified) {
       const nameWidth = octx.measureText(name).width;
-      const badgeX = nameX + nameWidth + 14;
+      const badgeX = nameX + nameWidth + 26;
       const badgeY = nameY;
-      const badgeR = 18;
+      const outerR = 18, innerR = 14, pts = 12;
+      const step = Math.PI / pts;
 
       octx.beginPath();
-      octx.arc(badgeX, badgeY, badgeR, 0, Math.PI * 2);
+      for (let i = 0; i < pts * 2; i++) {
+        const angle = i * step - Math.PI / 2;
+        const r = i % 2 === 0 ? outerR : innerR;
+        const x = badgeX + Math.cos(angle) * r;
+        const y = badgeY + Math.sin(angle) * r;
+        if (i === 0) octx.moveTo(x, y); else octx.lineTo(x, y);
+      }
+      octx.closePath();
       octx.fillStyle = '#1d9bf0';
       octx.fill();
 
@@ -841,7 +893,7 @@
       const startY = textAreaTop + (textAreaHeight - totalHeight) / 2;
 
       octx.font = '64px "Segoe UI", Arial, sans-serif';
-      octx.fillStyle = '#ffffff';
+      octx.fillStyle = SCHEMES[state.scheme].text;
       octx.direction = /[\u0590-\u05FF]/.test(slide.text) ? 'rtl' : 'ltr';
       octx.textAlign = 'right';
       octx.textBaseline = 'top';
@@ -854,7 +906,7 @@
     const total = state.slides.length;
     if (total > 1) {
       octx.font = '28px "Segoe UI", Arial, sans-serif';
-      octx.fillStyle = '#555555';
+      octx.fillStyle = SCHEMES[state.scheme].textMuted;
       octx.textAlign = 'center';
       octx.textBaseline = 'bottom';
       octx.fillText(`${index + 1} / ${total}`, W / 2, H - 36);
