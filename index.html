@@ -504,6 +504,7 @@
       <button class="btn-export" onclick="downloadCurrent()">⬇ הורד שקופית זו</button>
       <button class="btn-export secondary" onclick="downloadAll()">⬇ הורד הכל (ZIP)</button>
       <button class="btn-export whatsapp" id="btnPublish" onclick="publishToWhatsApp()">📤 פרסם לסטטוס</button>
+      <button class="btn-export whatsapp" id="btnPublishAll" onclick="publishAllToWhatsApp()">📤 פרסם הכל</button>
     </div>
   </div>
 
@@ -827,6 +828,56 @@
     } finally {
       btn.disabled = false;
       btn.textContent = '📤 פרסם לסטטוס';
+    }
+  }
+
+  async function publishAllToWhatsApp() {
+    const apiUrl = localStorage.getItem('gapi_url')   || '';
+    const id     = localStorage.getItem('gapi_id')    || '';
+    const token  = localStorage.getItem('gapi_token') || '';
+
+    if (!apiUrl || !id || !token) {
+      alert('הגדר את פרטי Green API תחילה (API URL, Instance ID, Token)');
+      return;
+    }
+
+    const total = state.slides.length;
+    const btn = document.getElementById('btnPublishAll');
+    btn.disabled = true;
+
+    try {
+      const mediaUrl = apiUrl.replace('api.greenapi.com', 'media.greenapi.com');
+
+      for (let i = 0; i < total; i++) {
+        btn.textContent = `מפרסם ${i + 1}/${total}...`;
+
+        const offscreen = document.createElement('canvas');
+        offscreen.width = W; offscreen.height = H;
+        await renderToCanvas(offscreen, i);
+        const blob = await new Promise(resolve => offscreen.toBlob(resolve, 'image/png'));
+
+        const uploadRes = await fetch(`${mediaUrl}/waInstance${id}/uploadFile/${token}`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'image/png' },
+          body: blob,
+        });
+        if (!uploadRes.ok) throw new Error(`Upload failed (slide ${i + 1}): ${uploadRes.status}`);
+        const { urlFile } = await uploadRes.json();
+
+        const statusRes = await fetch(`${apiUrl}/waInstance${id}/sendMediaStatus/${token}`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ urlFile, fileName: `slide-${i + 1}-${Date.now()}.png` }),
+        });
+        if (!statusRes.ok) throw new Error(`Status failed (slide ${i + 1}): ${statusRes.status}`);
+      }
+
+      alert(`${total} סטטוסים פורסמו בהצלחה! ✓`);
+    } catch (err) {
+      alert(`שגיאה: ${err.message}`);
+    } finally {
+      btn.disabled = false;
+      btn.textContent = '📤 פרסם הכל';
     }
   }
 
