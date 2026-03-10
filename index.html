@@ -393,6 +393,11 @@
     .editor::-webkit-scrollbar-track { background: transparent; }
     .editor::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
 
+    /* whatsapp publish button */
+    .btn-export.whatsapp { background: #25D366; color: #fff; }
+    .btn-export.whatsapp:hover { opacity: 0.85; }
+    .btn-export.whatsapp:disabled { opacity: 0.5; cursor: not-allowed; }
+
     /* scheme picker */
     .scheme-picker { display: flex; gap: 8px; margin-top: 2px; }
     .scheme-swatch {
@@ -464,6 +469,23 @@
       <button class="btn-add-slide" onclick="addSlide()">+ הוסף שקופית</button>
     </div>
 
+    <!-- Green API settings -->
+    <div class="profile-section">
+      <div class="section-title">Green API — WhatsApp</div>
+      <div class="field">
+        <label>API URL</label>
+        <input type="text" id="gapiUrl" placeholder="https://7103.api.greenapi.com" oninput="saveGapiSettings()" />
+      </div>
+      <div class="field">
+        <label>Instance ID</label>
+        <input type="text" id="gapiId" placeholder="7103169500" oninput="saveGapiSettings()" />
+      </div>
+      <div class="field">
+        <label>API Token</label>
+        <input type="password" id="gapiToken" placeholder="••••••••••••" oninput="saveGapiSettings()" />
+      </div>
+    </div>
+
   </div>
 
   <!-- PREVIEW -->
@@ -481,6 +503,7 @@
     <div class="export-row">
       <button class="btn-export" onclick="downloadCurrent()">⬇ הורד שקופית זו</button>
       <button class="btn-export secondary" onclick="downloadAll()">⬇ הורד הכל (ZIP)</button>
+      <button class="btn-export whatsapp" id="btnPublish" onclick="publishToWhatsApp()">📤 פרסם לסטטוס</button>
     </div>
   </div>
 
@@ -750,6 +773,63 @@
     renderSlide(state.current);
   }
 
+  function saveGapiSettings() {
+    localStorage.setItem('gapi_url',   document.getElementById('gapiUrl').value);
+    localStorage.setItem('gapi_id',    document.getElementById('gapiId').value);
+    localStorage.setItem('gapi_token', document.getElementById('gapiToken').value);
+  }
+
+  function loadGapiSettings() {
+    document.getElementById('gapiUrl').value   = localStorage.getItem('gapi_url')   || '';
+    document.getElementById('gapiId').value    = localStorage.getItem('gapi_id')    || '';
+    document.getElementById('gapiToken').value = localStorage.getItem('gapi_token') || '';
+  }
+
+  async function publishToWhatsApp() {
+    const apiUrl = localStorage.getItem('gapi_url')   || '';
+    const id     = localStorage.getItem('gapi_id')    || '';
+    const token  = localStorage.getItem('gapi_token') || '';
+
+    if (!apiUrl || !id || !token) {
+      alert('הגדר את פרטי Green API תחילה (API URL, Instance ID, Token)');
+      return;
+    }
+
+    const btn = document.getElementById('btnPublish');
+    btn.disabled = true;
+    btn.textContent = 'מפרסם...';
+
+    try {
+      const offscreen = document.createElement('canvas');
+      offscreen.width = W; offscreen.height = H;
+      await renderToCanvas(offscreen, state.current);
+      const blob = await new Promise(resolve => offscreen.toBlob(resolve, 'image/png'));
+
+      const mediaUrl = apiUrl.replace('api.greenapi.com', 'media.greenapi.com');
+      const uploadRes = await fetch(`${mediaUrl}/waInstance${id}/uploadFile/${token}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'image/png' },
+        body: blob,
+      });
+      if (!uploadRes.ok) throw new Error(`Upload failed: ${uploadRes.status}`);
+      const { urlFile } = await uploadRes.json();
+
+      const statusRes = await fetch(`${apiUrl}/waInstance${id}/sendMediaStatus/${token}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ urlFile, fileName: `slide-${Date.now()}.png` }),
+      });
+      if (!statusRes.ok) throw new Error(`Status failed: ${statusRes.status}`);
+
+      alert('הסטטוס פורסם בהצלחה! ✓');
+    } catch (err) {
+      alert(`שגיאה: ${err.message}`);
+    } finally {
+      btn.disabled = false;
+      btn.textContent = '📤 פרסם לסטטוס';
+    }
+  }
+
   function onAvatarUpload(event) {
     const file = event.target.files[0];
     if (!file) return;
@@ -980,6 +1060,7 @@
 
   /* ── INIT ── */
   loadProfile();
+  loadGapiSettings();
   renderSlidesList();
 </script>
 </body>
