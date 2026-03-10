@@ -1,0 +1,921 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Carousel Maker</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg: #0d0d0d;
+      --surface: #1a1a1a;
+      --surface2: #242424;
+      --border: #333;
+      --text: #f0f0f0;
+      --text-muted: #888;
+      --accent: #3b82f6;
+      --danger: #ef4444;
+      --radius: 10px;
+    }
+
+    body {
+      font-family: 'Segoe UI', Arial, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    header {
+      padding: 14px 24px;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      flex-shrink: 0;
+    }
+
+    header h1 {
+      font-size: 18px;
+      font-weight: 600;
+      letter-spacing: -0.3px;
+    }
+
+    header span {
+      font-size: 13px;
+      color: var(--text-muted);
+    }
+
+    .main {
+      display: grid;
+      grid-template-columns: 340px 1fr;
+      flex: 1;
+      overflow: hidden;
+    }
+
+    /* ── EDITOR ── */
+    .editor {
+      border-left: 1px solid var(--border);
+      overflow-y: auto;
+      padding: 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+    }
+
+    .section-title {
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: 0.8px;
+      text-transform: uppercase;
+      color: var(--text-muted);
+      margin-bottom: 10px;
+    }
+
+    .profile-section {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .avatar-row {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+    }
+
+    .avatar-preview {
+      width: 60px;
+      height: 60px;
+      border-radius: 50%;
+      background: var(--surface2);
+      border: 2px solid var(--border);
+      object-fit: cover;
+      cursor: pointer;
+      flex-shrink: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 22px;
+      color: var(--text-muted);
+      overflow: hidden;
+    }
+
+    .avatar-preview img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      border-radius: 50%;
+    }
+
+    .avatar-meta {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      flex: 1;
+    }
+
+    .btn-upload {
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      color: var(--text);
+      padding: 6px 12px;
+      border-radius: 6px;
+      font-size: 13px;
+      cursor: pointer;
+      transition: background 0.15s;
+      text-align: center;
+    }
+
+    .btn-upload:hover { background: var(--border); }
+
+    input[type="file"] { display: none; }
+
+    .field {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .field label {
+      font-size: 12px;
+      color: var(--text-muted);
+    }
+
+    .field input[type="text"],
+    .field textarea {
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      color: var(--text);
+      font-family: inherit;
+      font-size: 14px;
+      padding: 8px 10px;
+      outline: none;
+      transition: border-color 0.15s;
+      resize: none;
+    }
+
+    .field input[type="text"]:focus,
+    .field textarea:focus {
+      border-color: var(--accent);
+    }
+
+    .toggle-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-size: 13px;
+    }
+
+    .toggle {
+      position: relative;
+      width: 36px;
+      height: 20px;
+    }
+
+    .toggle input { display: none; }
+
+    .toggle-track {
+      position: absolute;
+      inset: 0;
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      cursor: pointer;
+      transition: background 0.15s;
+    }
+
+    .toggle input:checked + .toggle-track { background: var(--accent); border-color: var(--accent); }
+
+    .toggle-thumb {
+      position: absolute;
+      top: 2px;
+      left: 2px;
+      width: 14px;
+      height: 14px;
+      background: white;
+      border-radius: 50%;
+      transition: transform 0.15s;
+      pointer-events: none;
+    }
+
+    .toggle input:checked ~ .toggle-thumb { transform: translateX(16px); }
+
+    /* slide selector color */
+    .field select {
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      color: var(--text);
+      font-family: inherit;
+      font-size: 13px;
+      padding: 7px 10px;
+      outline: none;
+    }
+
+    /* ── SLIDES LIST ── */
+    .slides-list {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .slide-item {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 10px 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      cursor: pointer;
+      transition: border-color 0.15s;
+    }
+
+    .slide-item.active { border-color: var(--accent); }
+
+    .slide-item-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .slide-label {
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--text-muted);
+    }
+
+    .slide-item.active .slide-label { color: var(--accent); }
+
+    .slide-actions {
+      display: flex;
+      gap: 6px;
+    }
+
+    .btn-icon {
+      background: none;
+      border: none;
+      color: var(--text-muted);
+      cursor: pointer;
+      font-size: 14px;
+      padding: 2px 4px;
+      border-radius: 4px;
+      line-height: 1;
+      transition: color 0.15s, background 0.15s;
+    }
+
+    .btn-icon:hover { color: var(--text); background: var(--surface2); }
+    .btn-icon.del:hover { color: var(--danger); }
+
+    .slide-item textarea {
+      width: 100%;
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      color: var(--text);
+      font-family: inherit;
+      font-size: 13px;
+      padding: 8px 10px;
+      outline: none;
+      resize: vertical;
+      min-height: 64px;
+      line-height: 1.4;
+      transition: border-color 0.15s;
+      direction: rtl;
+    }
+
+    .slide-item textarea:focus { border-color: var(--accent); }
+
+    .btn-add-slide {
+      background: none;
+      border: 1px dashed var(--border);
+      border-radius: var(--radius);
+      color: var(--text-muted);
+      font-size: 13px;
+      padding: 10px;
+      cursor: pointer;
+      width: 100%;
+      transition: border-color 0.15s, color 0.15s;
+    }
+
+    .btn-add-slide:hover { border-color: var(--accent); color: var(--accent); }
+
+    /* ── PREVIEW ── */
+    .preview {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 20px;
+      padding: 24px;
+      overflow: hidden;
+    }
+
+    .canvas-wrapper {
+      position: relative;
+      border-radius: 12px;
+      overflow: hidden;
+      box-shadow: 0 8px 40px rgba(0,0,0,0.6);
+    }
+
+    #slideCanvas {
+      display: block;
+      max-width: 100%;
+      max-height: calc(100vh - 220px);
+    }
+
+    .preview-controls {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+    }
+
+    .btn-nav {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      color: var(--text);
+      width: 36px;
+      height: 36px;
+      border-radius: 50%;
+      font-size: 16px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: background 0.15s;
+    }
+
+    .btn-nav:hover { background: var(--surface2); }
+    .btn-nav:disabled { opacity: 0.3; cursor: default; }
+
+    .slide-counter {
+      font-size: 14px;
+      color: var(--text-muted);
+      min-width: 60px;
+      text-align: center;
+    }
+
+    .export-row {
+      display: flex;
+      gap: 10px;
+    }
+
+    .btn-export {
+      background: var(--accent);
+      border: none;
+      color: white;
+      font-size: 13px;
+      font-weight: 600;
+      padding: 9px 18px;
+      border-radius: 8px;
+      cursor: pointer;
+      transition: opacity 0.15s;
+    }
+
+    .btn-export:hover { opacity: 0.85; }
+
+    .btn-export.secondary {
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      color: var(--text);
+    }
+
+    .btn-export.secondary:hover { background: var(--border); }
+
+    /* scrollbar */
+    .editor::-webkit-scrollbar { width: 6px; }
+    .editor::-webkit-scrollbar-track { background: transparent; }
+    .editor::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+  </style>
+</head>
+<body>
+
+<header>
+  <h1>Carousel Maker</h1>
+  <span>Instagram 1080×1080 · WhatsApp Status</span>
+</header>
+
+<div class="main">
+
+  <!-- EDITOR -->
+  <div class="editor">
+
+    <!-- Profile settings -->
+    <div class="profile-section">
+      <div class="section-title">פרופיל</div>
+
+      <div class="avatar-row">
+        <div class="avatar-preview" id="avatarPreview" onclick="document.getElementById('avatarInput').click()">
+          <span id="avatarPlaceholder">+</span>
+        </div>
+        <div class="avatar-meta">
+          <label class="btn-upload" onclick="document.getElementById('avatarInput').click()">העלה תמונת פרופיל</label>
+          <button class="btn-upload" id="btnClearAvatar" style="display:none" onclick="clearAvatar()">הסר תמונה</button>
+        </div>
+        <input type="file" id="avatarInput" accept="image/*" onchange="onAvatarUpload(event)" />
+      </div>
+
+      <div class="field">
+        <label>שם / שם משתמש</label>
+        <input type="text" id="profileName" placeholder="hormozi" oninput="onProfileChange()" />
+      </div>
+
+      <div class="toggle-row">
+        <label class="toggle">
+          <input type="checkbox" id="verifiedToggle" onchange="onProfileChange()" />
+          <div class="toggle-track"></div>
+          <div class="toggle-thumb"></div>
+        </label>
+        <span>תג מאומת (✓)</span>
+      </div>
+    </div>
+
+    <!-- Slides -->
+    <div>
+      <div class="section-title">שקופיות</div>
+      <div class="slides-list" id="slidesList"></div>
+      <button class="btn-add-slide" onclick="addSlide()">+ הוסף שקופית</button>
+    </div>
+
+  </div>
+
+  <!-- PREVIEW -->
+  <div class="preview">
+    <div class="canvas-wrapper">
+      <canvas id="slideCanvas" width="1080" height="1080"></canvas>
+    </div>
+
+    <div class="preview-controls">
+      <button class="btn-nav" id="btnPrev" onclick="navigate(-1)">‹</button>
+      <span class="slide-counter" id="slideCounter">1 / 1</span>
+      <button class="btn-nav" id="btnNext" onclick="navigate(1)">›</button>
+    </div>
+
+    <div class="export-row">
+      <button class="btn-export" onclick="downloadCurrent()">⬇ הורד שקופית זו</button>
+      <button class="btn-export secondary" onclick="downloadAll()">⬇ הורד הכל (ZIP)</button>
+    </div>
+  </div>
+
+</div>
+
+<script>
+  /* ── STATE ── */
+  const state = {
+    profile: {
+      name: '',
+      avatarDataUrl: null,
+      verified: false,
+    },
+    slides: [{ text: '' }],
+    current: 0,
+  };
+
+  /* ── CANVAS ── */
+  const canvas = document.getElementById('slideCanvas');
+  const ctx = canvas.getContext('2d');
+  const W = 1080;
+  const H = 1080;
+
+  function renderSlide(index) {
+    const slide = state.slides[index];
+    if (!slide) return;
+
+    ctx.clearRect(0, 0, W, H);
+
+    // Background
+    ctx.fillStyle = '#111111';
+    ctx.fillRect(0, 0, W, H);
+
+    const PAD = 72;
+    const AVATAR_SIZE = 120;
+    const AVATAR_X = PAD;
+    const AVATAR_Y = PAD;
+
+    // Profile picture
+    if (state.profile.avatarDataUrl) {
+      const img = new Image();
+      img.onload = () => {
+        // clip circle
+        ctx.save();
+        ctx.beginPath();
+        ctx.arc(AVATAR_X + AVATAR_SIZE / 2, AVATAR_Y + AVATAR_SIZE / 2, AVATAR_SIZE / 2, 0, Math.PI * 2);
+        ctx.clip();
+        ctx.drawImage(img, AVATAR_X, AVATAR_Y, AVATAR_SIZE, AVATAR_SIZE);
+        ctx.restore();
+        drawOverlay(slide, AVATAR_X, AVATAR_Y, AVATAR_SIZE, PAD, index);
+      };
+      img.src = state.profile.avatarDataUrl;
+    } else {
+      // placeholder circle
+      ctx.save();
+      ctx.beginPath();
+      ctx.arc(AVATAR_X + AVATAR_SIZE / 2, AVATAR_Y + AVATAR_SIZE / 2, AVATAR_SIZE / 2, 0, Math.PI * 2);
+      ctx.fillStyle = '#2a2a2a';
+      ctx.fill();
+      ctx.restore();
+      drawOverlay(slide, AVATAR_X, AVATAR_Y, AVATAR_SIZE, PAD, index);
+    }
+  }
+
+  function drawOverlay(slide, AVATAR_X, AVATAR_Y, AVATAR_SIZE, PAD, index) {
+    // Name
+    const nameX = AVATAR_X + AVATAR_SIZE + 24;
+    const nameY = AVATAR_Y + AVATAR_SIZE / 2;
+
+    ctx.font = 'bold 40px "Segoe UI", Arial, sans-serif';
+    ctx.fillStyle = '#ffffff';
+    ctx.textBaseline = 'middle';
+    ctx.textAlign = 'left';
+
+    const name = state.profile.name || 'שם משתמש';
+    ctx.fillText(name, nameX, nameY);
+
+    // Verified badge
+    if (state.profile.verified) {
+      const nameWidth = ctx.measureText(name).width;
+      const badgeX = nameX + nameWidth + 14;
+      const badgeY = nameY;
+      const badgeR = 18;
+
+      ctx.beginPath();
+      ctx.arc(badgeX, badgeY, badgeR, 0, Math.PI * 2);
+      ctx.fillStyle = '#1d9bf0';
+      ctx.fill();
+
+      ctx.font = 'bold 20px "Segoe UI", Arial, sans-serif';
+      ctx.fillStyle = '#ffffff';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText('✓', badgeX, badgeY);
+    }
+
+    // Main text
+    if (slide.text && slide.text.trim()) {
+      const textAreaTop = AVATAR_Y + AVATAR_SIZE + 60;
+      const textAreaBottom = H - 100;
+      const textAreaHeight = textAreaBottom - textAreaTop;
+      const maxWidth = W - PAD * 2;
+
+      const lines = wrapText(ctx, slide.text.trim(), maxWidth, 68);
+      const lineHeight = 90;
+      const totalHeight = lines.length * lineHeight;
+      const startY = textAreaTop + (textAreaHeight - totalHeight) / 2;
+
+      ctx.font = '64px "Segoe UI", Arial, sans-serif';
+      ctx.fillStyle = '#ffffff';
+      ctx.textAlign = 'right';
+      ctx.textBaseline = 'top';
+
+      lines.forEach((line, i) => {
+        ctx.fillText(line, W - PAD, startY + i * lineHeight);
+      });
+    }
+
+    // Slide counter
+    const total = state.slides.length;
+    if (total > 1) {
+      ctx.font = '28px "Segoe UI", Arial, sans-serif';
+      ctx.fillStyle = '#555555';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'bottom';
+      ctx.fillText(`${index + 1} / ${total}`, W / 2, H - 36);
+    }
+  }
+
+  function wrapText(ctx, text, maxWidth, fontSize) {
+    ctx.font = `${fontSize}px "Segoe UI", Arial, sans-serif`;
+    const words = text.split(' ');
+    const lines = [];
+    let current = '';
+
+    for (const word of words) {
+      const test = current ? current + ' ' + word : word;
+      if (ctx.measureText(test).width > maxWidth && current) {
+        lines.push(current);
+        current = word;
+      } else {
+        current = test;
+      }
+    }
+    if (current) lines.push(current);
+    return lines;
+  }
+
+  /* ── SLIDES UI ── */
+  function renderSlidesList() {
+    const list = document.getElementById('slidesList');
+    list.innerHTML = '';
+
+    state.slides.forEach((slide, i) => {
+      const item = document.createElement('div');
+      item.className = 'slide-item' + (i === state.current ? ' active' : '');
+      item.dataset.index = i;
+
+      item.innerHTML = `
+        <div class="slide-item-header">
+          <span class="slide-label">שקופית ${i + 1}</span>
+          <div class="slide-actions">
+            ${i > 0 ? `<button class="btn-icon" title="הזז למעלה" onclick="moveSlide(${i}, -1)">↑</button>` : ''}
+            ${i < state.slides.length - 1 ? `<button class="btn-icon" title="הזז למטה" onclick="moveSlide(${i}, 1)">↓</button>` : ''}
+            ${state.slides.length > 1 ? `<button class="btn-icon del" title="מחק" onclick="deleteSlide(${i})">✕</button>` : ''}
+          </div>
+        </div>
+        <textarea
+          placeholder="הכנס טקסט לשקופית..."
+          rows="3"
+          oninput="onSlideTextChange(${i}, this.value)"
+          onclick="selectSlide(${i})"
+        >${escapeHtml(slide.text)}</textarea>
+      `;
+
+      list.appendChild(item);
+    });
+
+    updateCounter();
+    renderSlide(state.current);
+  }
+
+  function escapeHtml(str) {
+    return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  }
+
+  function onSlideTextChange(index, value) {
+    state.slides[index].text = value;
+    if (index === state.current) renderSlide(state.current);
+  }
+
+  function selectSlide(index) {
+    state.current = index;
+    renderSlidesList();
+  }
+
+  function addSlide() {
+    state.slides.push({ text: '' });
+    state.current = state.slides.length - 1;
+    renderSlidesList();
+    // focus the new textarea
+    setTimeout(() => {
+      const items = document.querySelectorAll('.slide-item');
+      const last = items[items.length - 1];
+      if (last) last.querySelector('textarea')?.focus();
+    }, 50);
+  }
+
+  function deleteSlide(index) {
+    state.slides.splice(index, 1);
+    if (state.current >= state.slides.length) state.current = state.slides.length - 1;
+    renderSlidesList();
+  }
+
+  function moveSlide(index, dir) {
+    const target = index + dir;
+    if (target < 0 || target >= state.slides.length) return;
+    [state.slides[index], state.slides[target]] = [state.slides[target], state.slides[index]];
+    if (state.current === index) state.current = target;
+    else if (state.current === target) state.current = index;
+    renderSlidesList();
+  }
+
+  /* ── NAVIGATION ── */
+  function navigate(dir) {
+    const next = state.current + dir;
+    if (next < 0 || next >= state.slides.length) return;
+    state.current = next;
+    renderSlidesList();
+  }
+
+  function updateCounter() {
+    document.getElementById('slideCounter').textContent = `${state.current + 1} / ${state.slides.length}`;
+    document.getElementById('btnPrev').disabled = state.current === 0;
+    document.getElementById('btnNext').disabled = state.current === state.slides.length - 1;
+  }
+
+  /* ── PROFILE ── */
+  function onProfileChange() {
+    state.profile.name = document.getElementById('profileName').value;
+    state.profile.verified = document.getElementById('verifiedToggle').checked;
+    saveProfile();
+    renderSlide(state.current);
+  }
+
+  function onAvatarUpload(event) {
+    const file = event.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      state.profile.avatarDataUrl = e.target.result;
+      showAvatarPreview(e.target.result);
+      saveProfile();
+      renderSlide(state.current);
+    };
+    reader.readAsDataURL(file);
+  }
+
+  function clearAvatar() {
+    state.profile.avatarDataUrl = null;
+    document.getElementById('avatarPreview').innerHTML = '<span id="avatarPlaceholder">+</span>';
+    document.getElementById('btnClearAvatar').style.display = 'none';
+    saveProfile();
+    renderSlide(state.current);
+  }
+
+  function showAvatarPreview(dataUrl) {
+    const preview = document.getElementById('avatarPreview');
+    preview.innerHTML = `<img src="${dataUrl}" alt="avatar" />`;
+    document.getElementById('btnClearAvatar').style.display = '';
+  }
+
+  /* ── PERSISTENCE ── */
+  function saveProfile() {
+    localStorage.setItem('carousel_profile', JSON.stringify(state.profile));
+  }
+
+  function loadProfile() {
+    try {
+      const raw = localStorage.getItem('carousel_profile');
+      if (!raw) return;
+      const saved = JSON.parse(raw);
+      state.profile.name = saved.name || '';
+      state.profile.verified = saved.verified || false;
+      state.profile.avatarDataUrl = saved.avatarDataUrl || null;
+
+      document.getElementById('profileName').value = state.profile.name;
+      document.getElementById('verifiedToggle').checked = state.profile.verified;
+
+      if (state.profile.avatarDataUrl) {
+        showAvatarPreview(state.profile.avatarDataUrl);
+      }
+    } catch {}
+  }
+
+  /* ── EXPORT ── */
+  function renderToDataUrl(index) {
+    return new Promise((resolve) => {
+      const offscreen = document.createElement('canvas');
+      offscreen.width = W;
+      offscreen.height = H;
+      const octx = offscreen.getContext('2d');
+
+      const slide = state.slides[index];
+
+      octx.fillStyle = '#111111';
+      octx.fillRect(0, 0, W, H);
+
+      const PAD = 72;
+      const AVATAR_SIZE = 120;
+      const AVATAR_X = PAD;
+      const AVATAR_Y = PAD;
+
+      function finish() {
+        drawOverlayTo(octx, slide, AVATAR_X, AVATAR_Y, AVATAR_SIZE, PAD, index);
+        resolve(offscreen.toDataURL('image/png'));
+      }
+
+      if (state.profile.avatarDataUrl) {
+        const img = new Image();
+        img.onload = () => {
+          octx.save();
+          octx.beginPath();
+          octx.arc(AVATAR_X + AVATAR_SIZE / 2, AVATAR_Y + AVATAR_SIZE / 2, AVATAR_SIZE / 2, 0, Math.PI * 2);
+          octx.clip();
+          octx.drawImage(img, AVATAR_X, AVATAR_Y, AVATAR_SIZE, AVATAR_SIZE);
+          octx.restore();
+          finish();
+        };
+        img.src = state.profile.avatarDataUrl;
+      } else {
+        octx.save();
+        octx.beginPath();
+        octx.arc(AVATAR_X + AVATAR_SIZE / 2, AVATAR_Y + AVATAR_SIZE / 2, AVATAR_SIZE / 2, 0, Math.PI * 2);
+        octx.fillStyle = '#2a2a2a';
+        octx.fill();
+        octx.restore();
+        finish();
+      }
+    });
+  }
+
+  function drawOverlayTo(octx, slide, AVATAR_X, AVATAR_Y, AVATAR_SIZE, PAD, index) {
+    const nameX = AVATAR_X + AVATAR_SIZE + 24;
+    const nameY = AVATAR_Y + AVATAR_SIZE / 2;
+
+    octx.font = 'bold 40px "Segoe UI", Arial, sans-serif';
+    octx.fillStyle = '#ffffff';
+    octx.textBaseline = 'middle';
+    octx.textAlign = 'left';
+
+    const name = state.profile.name || 'שם משתמש';
+    octx.fillText(name, nameX, nameY);
+
+    if (state.profile.verified) {
+      const nameWidth = octx.measureText(name).width;
+      const badgeX = nameX + nameWidth + 14;
+      const badgeY = nameY;
+      const badgeR = 18;
+
+      octx.beginPath();
+      octx.arc(badgeX, badgeY, badgeR, 0, Math.PI * 2);
+      octx.fillStyle = '#1d9bf0';
+      octx.fill();
+
+      octx.font = 'bold 20px "Segoe UI", Arial, sans-serif';
+      octx.fillStyle = '#ffffff';
+      octx.textAlign = 'center';
+      octx.textBaseline = 'middle';
+      octx.fillText('✓', badgeX, badgeY);
+    }
+
+    if (slide.text && slide.text.trim()) {
+      const textAreaTop = AVATAR_Y + AVATAR_SIZE + 60;
+      const textAreaBottom = H - 100;
+      const textAreaHeight = textAreaBottom - textAreaTop;
+      const maxWidth = W - PAD * 2;
+
+      const lines = wrapTextCtx(octx, slide.text.trim(), maxWidth, 64);
+      const lineHeight = 90;
+      const totalHeight = lines.length * lineHeight;
+      const startY = textAreaTop + (textAreaHeight - totalHeight) / 2;
+
+      octx.font = '64px "Segoe UI", Arial, sans-serif';
+      octx.fillStyle = '#ffffff';
+      octx.textAlign = 'right';
+      octx.textBaseline = 'top';
+
+      lines.forEach((line, i) => {
+        octx.fillText(line, W - PAD, startY + i * lineHeight);
+      });
+    }
+
+    const total = state.slides.length;
+    if (total > 1) {
+      octx.font = '28px "Segoe UI", Arial, sans-serif';
+      octx.fillStyle = '#555555';
+      octx.textAlign = 'center';
+      octx.textBaseline = 'bottom';
+      octx.fillText(`${index + 1} / ${total}`, W / 2, H - 36);
+    }
+  }
+
+  function wrapTextCtx(octx, text, maxWidth, fontSize) {
+    octx.font = `${fontSize}px "Segoe UI", Arial, sans-serif`;
+    const words = text.split(' ');
+    const lines = [];
+    let current = '';
+
+    for (const word of words) {
+      const test = current ? current + ' ' + word : word;
+      if (octx.measureText(test).width > maxWidth && current) {
+        lines.push(current);
+        current = word;
+      } else {
+        current = test;
+      }
+    }
+    if (current) lines.push(current);
+    return lines;
+  }
+
+  async function downloadCurrent() {
+    const dataUrl = await renderToDataUrl(state.current);
+    const a = document.createElement('a');
+    a.href = dataUrl;
+    a.download = `slide-${state.current + 1}.png`;
+    a.click();
+  }
+
+  async function downloadAll() {
+    if (typeof JSZip === 'undefined') {
+      alert('JSZip לא נטען. בדוק חיבור אינטרנט ונסה שוב.');
+      return;
+    }
+
+    const zip = new JSZip();
+
+    for (let i = 0; i < state.slides.length; i++) {
+      const dataUrl = await renderToDataUrl(i);
+      const base64 = dataUrl.replace('data:image/png;base64,', '');
+      zip.file(`slide-${i + 1}.png`, base64, { base64: true });
+    }
+
+    const blob = await zip.generateAsync({ type: 'blob' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'carousel.zip';
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+
+  /* ── INIT ── */
+  loadProfile();
+  renderSlidesList();
+</script>
+</body>
+</html>
